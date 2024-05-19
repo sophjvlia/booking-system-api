@@ -7,6 +7,42 @@
   <title>Movie App API</title>
 </head>
 <body>
+  <h1>API Documentation</h1>
 
+  <h2>Register User</h2>
+  <p><strong>POST /signup</strong></p>
+  <p>Register a new user with email and password.</p>
+
+  <h2>Login User</h2>
+  <p><strong>POST /login</strong></p>
+  <p>Login an existing user with email and password.</p>
+
+  <h2>List All Movies</h2>
+  <p><strong>GET /movies</strong></p>
+  <p>Retrieve a list of all movies.</p>
+
+  <h2>List Movie Details</h2>
+  <p><strong>GET /movies/:movie_id</strong></p>
+  <p>Retrieve details of a specific movie by its ID, including available dates.</p>
+
+  <h2>List Available Timeslots and Seats</h2>
+  <p><strong>GET /movies/:movie_id/availability/:date</strong></p>
+  <p>Retrieve available timeslots and seats for a movie on a specific date.</p>
+
+  <h2>Create Booking</h2>
+  <p><strong>POST /add-booking</strong></p>
+  <p>Create a new booking for a movie timeslot.</p>
+
+  <h2>Edit Booking</h2>
+  <p><strong>POST /edit-booking/:booking_id</strong></p>
+  <p>Edit an existing booking by its ID.</p>
+
+  <h2>Delete Booking</h2>
+  <p><strong>POST /delete-booking/:booking_id</strong></p>
+  <p>Delete a booking by its ID.</p>
+
+  <h2>List User Bookings</h2>
+  <p><strong>GET /bookings</strong></p>
+  <p>List all bookings for the authenticated user.</p>
 </body>
 </html>

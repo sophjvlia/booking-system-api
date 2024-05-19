@@ -279,6 +279,20 @@ app.post('/delete-booking/:booking_id', async (req, res) => {
   }
 });
 
+// Define the verifyToken middleware
+function verifyToken(req, res, next) {
+  // Assuming you have a header like 'Authorization: Bearer <token>'
+  const bearerHeader = req.headers['authorization'];
+
+  if (typeof bearerHeader !== 'undefined') {
+    const bearerToken = bearerHeader.split(' ')[1];
+    req.token = bearerToken;
+    next(); // Call next middleware or route handler
+  } else {
+    res.sendStatus(403); // Forbidden if token is not provided
+  }
+}
+
 app.get('/bookings', verifyToken, async (req, res) => {
   const client = await pool.connect();
 
