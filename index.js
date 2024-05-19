@@ -167,15 +167,56 @@ app.post('/add-booking', async (req, res) => {
   try {
     const { movie_id, timeslot_id, seat_id, date, user_id, phone, email } = req.body;
 
-    const result = await client.query('INSERT INTO bookings (movie_id, timeslot_id, seat_id, date, user_id, phone, email) VALUES ($1, $2, $3, $4, $5, $6, $7)', [movie_id, timeslot_id, seat_id, date, user_id, phone, email]);
+    const result = await client.query('INSERT INTO bookings (movie_id, timeslot_id, seat_id, date, user_id, phone, email) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *', [movie_id, timeslot_id, seat_id, date, user_id, phone, email]);
 
-    const booking_id = result.rows[0].booking_id;
+    // Retrieve the entire row of the newly created booking
+    const newBooking = result.rows[0];
 
     if (result.rows[0].length > 0) {
       await client.query('UPDATE seats SET booking_status = $1 WHERE seat_id = $2 AND movie_id = $3 AND timeslot_id = $4', [1, seat_id, movie_id, timeslot_id]);
     }
 
-    res.status(201).json({ message: 'Booking created successfully', booking_id: booking_id });
+    res.status(201).json({ message: 'Booking created successfully', booking: newBooking });
+  } catch (err) {
+    console.error('Error: ', err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Edit booking
+app.post('/edit-booking/:booking_id', async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { booking_id } = req.params;
+    const { movie_id, timeslot_id, seat_id, date, user_id, phone, email } = req.body;
+
+    await client.query(
+      'UPDATE bookings SET movie_id = $1, timeslot_id = $2, seat_id = $3, date = $4, user_id = $5, phone = $6, email = $7 WHERE booking_id = $8',
+      [movie_id, timeslot_id, seat_id, date, user_id, phone, email, booking_id]
+    );
+
+    res.status(200).json({ message: 'Booking updated successfully' });
+  } catch (err) {
+    console.error('Error: ', err.message);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+// Delete booking
+app.post('/delete-booking/:booking_id', async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { booking_id } = req.params;
+
+    await client.query('DELETE FROM bookings WHERE booking_id = $1', [booking_id]);
+
+    res.status(200).json({ message: 'Booking deleted successfully' });
   } catch (err) {
     console.error('Error: ', err.message);
     res.status(500).json({ error: err.message });
