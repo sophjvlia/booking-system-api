@@ -167,13 +167,67 @@ app.post('/add-booking', async (req, res) => {
   try {
     const { movie_id, timeslot_id, seat_id, date, user_id, phone, email } = req.body;
 
-    const result = await client.query('INSERT INTO bookings (movie_id, timeslot_id, seat_id, date, user_id, phone, email) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *', [movie_id, timeslot_id, seat_id, date, user_id, phone, email]);
+    // Check if the booking already exists
+    const existingBooking = await client.query(
+      'SELECT * FROM bookings WHERE movie_id = $1 AND timeslot_id = $2 AND seat_id = $3 AND date = $4',
+      [movie_id, timeslot_id, seat_id, date]
+    );
+
+    if (existingBooking.rows.length > 0) {
+      // A booking already exists for the given movie, timeslot, seat, and date
+      res.status(400).json({ error: 'Booking already exists' });
+    } else {
+      // Proceed with inserting the new booking
+      try {
+        const result = await client.query(
+          'INSERT INTO bookings (movie_id, timeslot_id, seat_id, date, user_id, phone, email) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+          [movie_id, timeslot_id, seat_id, date, user_id, phone, email]
+        );
+
+        // Check if the insert was successful
+        if (result.rows.length > 0) {
+          res.status(201).json({ message: 'Booking successful', booking: result.rows[0] });
+        } else {
+          res.status(500).json({ error: 'Failed to create booking' });
+        }
+      } catch (err) {
+        console.error('Error: ', err.message);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    }
 
     // Retrieve the entire row of the newly created booking
     const newBooking = result.rows[0];
 
-    if (result.rows[0].length > 0) {
-      await client.query('UPDATE seats SET booking_status = $1 WHERE seat_id = $2 AND movie_id = $3 AND timeslot_id = $4', [1, seat_id, movie_id, timeslot_id]);
+    if (result.rows.length > 0) {
+      const { seat_id, movie_id, timeslot_id } = result.rows[0];
+      const updateQuery = `
+        WITH selected_seat AS (
+          SELECT * FROM seats
+          WHERE seat_id = $1 AND movie_id = $2 AND timeslot_id = $3
+        )
+        UPDATE seats
+        SET booking_status = $4
+        WHERE seat_id = $1 AND movie_id = $2 AND timeslot_id = $3
+        RETURNING selected_seat.*;
+      `;
+      const params = [seat_id, movie_id, timeslot_id, 1]; // Assuming 1 represents the booked status
+
+      try {
+        const updateResult = await client.query(updateQuery, params);
+        const updatedSeat = updateResult.rows[0]; // The first row returned by the UPDATE query
+
+        if (updatedSeat) {
+          res.status(200).json({ message: 'Seat booking status updated', seat: updatedSeat });
+        } else {
+          res.status(404).json({ error: 'Seat not found' });
+        }
+      } catch (err) {
+        console.error('Error: ', err.message);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    } else {
+      res.status(404).json({ error: 'Seat not found' });
     }
 
     res.status(201).json({ message: 'Booking created successfully', booking: newBooking });
