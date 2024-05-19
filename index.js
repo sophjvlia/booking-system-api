@@ -279,6 +279,22 @@ app.post('/delete-booking/:booking_id', async (req, res) => {
   }
 });
 
+app.get('/bookings', verifyToken, async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { user_id } = req;
+    const result = await client.query('SELECT * FROM bookings WHERE user_id = $1', [user_id]);
+
+    res.status(200).json({ bookings: result.rows });
+  } catch (err) {
+    console.error('Error: ', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+});
+
 const port = process.env.PORT || 3000;
 
 app.listen(port, () => {
