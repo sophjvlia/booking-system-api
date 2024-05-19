@@ -13,6 +13,7 @@ const SECRET_KEY = process.env['SECRET_KEY'];
 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { resourceLimits } = require('worker_threads');
 
 const pool = new Pool({
   connectionString: DATABASE_URL,
@@ -37,24 +38,6 @@ getPostgresVersion();
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname + '/index.html'));
 });
-
-
-// Retrieve all users
-app.get('/users', async (req, res) => {
-  const client = await pool.connect();
-
-  try {
-    const query = 'SELECT * FROM users';
-    const result = await client.query(query);
-
-    res.json(result.rows);
-  } catch (err) {
-    console.log(err.stack);
-    res.status(500).send('An error occured while fetching users');
-  } finally {
-    client.release();
-  }
-})
 
 // Register user
 app.post('/signup', async (req, res) => {
@@ -172,6 +155,26 @@ app.get('/movies/:movie_id/availability/:date', async (req, res) => {
   } catch (err) {
     console.log(err.stack);
     res.status(500).send('An error occured while fetching movies');
+  } finally {
+    client.release();
+  }
+});
+
+// Create booking
+app.post('/add-booking', async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { movie_id, timeslot_id, seat_id, date, user_id, phone, email } = req.body;
+
+    await client.query('INSERT INTO bookings (movie_id, timeslot_id, seat_id, date, user_id, phone, email) VALUES ($1, $2, $3, $4, $5, $6, $7)', [movie_id, timeslot_id, seat_id, date, user_id, phone, email]);
+
+    const booking_id = result.rows[0].booking_id;
+
+    res.status(201).json({ message: 'Booking created successfully', booking_id: booking_id });
+  } catch (err) {
+    console.error('Error: ', err.message);
+    res.status(500).json({ error: err.message });
   } finally {
     client.release();
   }
