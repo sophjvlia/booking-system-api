@@ -167,9 +167,13 @@ app.post('/add-booking', async (req, res) => {
   try {
     const { movie_id, timeslot_id, seat_id, date, user_id, phone, email } = req.body;
 
-    await client.query('INSERT INTO bookings (movie_id, timeslot_id, seat_id, date, user_id, phone, email) VALUES ($1, $2, $3, $4, $5, $6, $7)', [movie_id, timeslot_id, seat_id, date, user_id, phone, email]);
+    const result = await client.query('INSERT INTO bookings (movie_id, timeslot_id, seat_id, date, user_id, phone, email) VALUES ($1, $2, $3, $4, $5, $6, $7)', [movie_id, timeslot_id, seat_id, date, user_id, phone, email]);
 
     const booking_id = result.rows[0].booking_id;
+
+    if (result.rows[0].length > 0) {
+      await client.query('UPDATE seats SET booking_status = $1 WHERE seat_id = $2 AND movie_id = $3 AND timeslot_id = $4', [1, seat_id, movie_id, timeslot_id]);
+    }
 
     res.status(201).json({ message: 'Booking created successfully', booking_id: booking_id });
   } catch (err) {
