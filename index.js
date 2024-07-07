@@ -111,25 +111,28 @@ app.get('/movies', async (req, res) => {
 })
 
 // List movie details
-app.get('/movies/:movie_id', async (req, res) => {
+app.post('/movies', async (req, res) => {
   const client = await pool.connect();
-  const { movie_id } = req.params;
+  const { movie_id } = req.body;
 
   try {
     const movieQuery = 'SELECT * FROM movies WHERE movie_id = $1';
     const movieResult = await client.query(movieQuery, [movie_id]);
+
+    if (movieResult.rows.length === 0) {
+      return res.status(404).send('Movie not found');
+    }
 
     const dateQuery = 'SELECT DISTINCT date FROM timeslots WHERE movie_id = $1 ORDER BY date';
     const dateResult = await client.query(dateQuery, [movie_id]);
 
     const movieDetails = movieResult.rows[0];
     const availableDates = dateResult.rows.map(row => row.date.toISOString().split('T')[0]);
-    
 
     res.json({ movie: movieDetails, available_dates: availableDates });
   } catch (err) {
     console.log(err.stack);
-    res.status(500).send('An error occured while fetching movies');
+    res.status(500).send('An error occurred while fetching movie details');
   } finally {
     client.release();
   }
