@@ -114,6 +114,7 @@ app.get('/movies', async (req, res) => {
 app.get('/movies/:movie_id', async (req, res) => {
   const client = await pool.connect();
   const { movie_id } = req.params;
+  //res.send(movie_id);
 
   try {
     const movieQuery = 'SELECT * FROM movies WHERE movie_id = $1';
@@ -123,7 +124,7 @@ app.get('/movies/:movie_id', async (req, res) => {
     const dateResult = await client.query(dateQuery, [movie_id]);
 
     const movieDetails = movieResult.rows[0];
-    const availableDates = dateResult.rows[0];
+    const availableDates = dateResult.rows.map(row => row.date);
     
 
     res.json({ movie: movieDetails, available_dates: availableDates });
