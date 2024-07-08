@@ -114,7 +114,6 @@ app.get('/movies', async (req, res) => {
 app.get('/movies/:movie_id', async (req, res) => {
   const client = await pool.connect();
   const { movie_id } = req.params;
-  //res.send(movie_id);
 
   try {
     const movieQuery = 'SELECT * FROM movies WHERE movie_id = $1';
@@ -136,7 +135,7 @@ app.get('/movies/:movie_id', async (req, res) => {
   }
 });
 
-// List available timeslots and seats
+// List available timeslots
 app.get('/movies/:movie_id/availability/:date', async (req, res) => {
   const client = await pool.connect();
   
@@ -144,11 +143,9 @@ app.get('/movies/:movie_id/availability/:date', async (req, res) => {
 
   try {
     const query = `
-      SELECT DISTINCT t.timeslot_id, t.start_time, t.end_time, ARRAY_AGG(s.seat_number) AS available_seats
+      SELECT DISTINCT t.timeslot_id, t.start_time, t.end_time
       FROM timeslots t
-      INNER JOIN seats s ON t.timeslot_id = s.timeslot_id
-      WHERE t.movie_id = $1 AND t.date = $2 AND s.booking_status = 0
-      GROUP BY t.timeslot_id, t.start_time, t.end_time, t.available_seats
+      WHERE t.movie_id = $1 AND t.date = $2
     `;
     const result = await client.query(query, [movie_id, date]);
 
