@@ -163,7 +163,7 @@ app.post('/add-booking', async (req, res) => {
   const client = await pool.connect();
 
   try {
-    const { movie_id, timeslot_id, seat_id, date, user_id, phone, email } = req.body;
+    const { movie_id, timeslot_id, seat_id, date, user_id, email } = req.body;
 
     // Check if the booking already exists
     const existingBooking = await client.query(
@@ -178,8 +178,8 @@ app.post('/add-booking', async (req, res) => {
       // Proceed with inserting the new booking
       try {
         const result = await client.query(
-          'INSERT INTO bookings (movie_id, timeslot_id, seat_id, date, user_id, phone, email) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-          [movie_id, timeslot_id, seat_id, date, user_id, phone, email]
+          'INSERT INTO bookings (movie_id, timeslot_id, seat_id, date, user_id, email) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+          [movie_id, timeslot_id, seat_id, date, user_id, email]
         );
 
         // Check if the insert was successful
@@ -243,11 +243,11 @@ app.post('/edit-booking/:booking_id', async (req, res) => {
 
   try {
     const { booking_id } = req.params;
-    const { movie_id, timeslot_id, seat_id, date, user_id, phone, email } = req.body;
+    const { movie_id, timeslot_id, seat_id, date, user_id, email } = req.body;
 
     await client.query(
-      'UPDATE bookings SET movie_id = $1, timeslot_id = $2, seat_id = $3, date = $4, user_id = $5, phone = $6, email = $7 WHERE booking_id = $8',
-      [movie_id, timeslot_id, seat_id, date, user_id, phone, email, booking_id]
+      'UPDATE bookings SET movie_id = $1, timeslot_id = $2, seat_id = $3, date = $4, user_id = $5, email = $6 WHERE booking_id = $7',
+      [movie_id, timeslot_id, seat_id, date, user_id, email, booking_id]
     );
 
     res.status(200).json({ message: 'Booking updated successfully' });
