@@ -296,8 +296,24 @@ app.get('/bookings/:user_id', async (req, res) => {
 
   try {
     const { user_id } = req.params;
-    const result = await client.query('SELECT * FROM bookings WHERE user_id = $1', [user_id]);
-
+    const query = `
+      SELECT 
+        bookings.booking_id,
+        bookings.date,
+        bookings.user_id,
+        bookings.email,
+        movies.thumbnail_url,
+        movies.title,
+        timeslots.start_time,
+        timeslots.end_time,
+        seats.seat_number
+      FROM bookings
+      JOIN movies ON bookings.movie_id = movies.movie_id
+      JOIN timeslots ON bookings.timeslot_id = timeslots.timeslot_id
+      JOIN seats ON bookings.seat_id = seats.seat_id
+      WHERE bookings.user_id = $1
+    `;
+    const result = await client.query(query, [user_id]);
     res.status(200).json({ bookings: result.rows });
   } catch (err) {
     console.error('Error: ', err.message);
