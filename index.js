@@ -291,7 +291,7 @@ function verifyToken(req, res, next) {
   }
 }
 
-app.get('/bookings/:user_id', verifyToken, async (req, res) => {
+app.get('/bookings/:user_id', async (req, res) => {
   const client = await pool.connect();
 
   try {
