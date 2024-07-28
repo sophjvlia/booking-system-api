@@ -169,6 +169,7 @@ app.get('/movies/:movie_id/:timeslot_id/seats', async (req, res) => {
       SELECT DISTINCT s.seat_id, s.seat_number
       FROM seats s
       WHERE s.movie_id = $1 AND s.timeslot_id = $2 AND s.booking_status != 1
+      ORDER BY s.seat_number ASC
     `;
     const result = await client.query(query, [movie_id, timeslot_id]);
 
