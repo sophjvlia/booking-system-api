@@ -158,6 +158,29 @@ app.get('/movies/:movie_id/availability/:date', async (req, res) => {
   }
 });
 
+// List available seats
+app.get('/movies/:movie_id/:timeslot_id/seats', async (req, res) => {
+  const client = await pool.connect();
+
+  const { movie_id, timeslot_id } = req.params;
+
+  try {
+    const query = `
+      SELECT DISTINCT s.seat_id, s.seat_number
+      FROM seats s
+      WHERE s.movie_id = $1 AND s.timeslot_id = $2 AND s.booking_status != 1
+    `;
+    const result = await client.query(query, [movie_id, timeslot_id]);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.log(err.stack);
+    res.status(500).send('An error occured while fetching movies');
+  } finally {
+    client.release();
+  }
+});
+
 // Create booking
 app.post('/add-booking', async (req, res) => {
   const client = await pool.connect();
