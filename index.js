@@ -252,7 +252,7 @@ app.post('/add-booking', async (req, res) => {
       res.status(404).json({ error: 'Seat not found' });
     }
 
-    res.status(201).json({ message: 'Booking created successfully', booking: newBooking });
+    res.status(201).json({ message: 'Booking created successfully', booking: newBooking, updatedSeat: updatedSeat });
   } catch (err) {
     console.error('Error: ', err.message);
     res.status(500).json({ error: err.message });
