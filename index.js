@@ -220,39 +220,26 @@ app.post('/add-booking', async (req, res) => {
 
     // Retrieve the entire row of the newly created booking
     const newBooking = result.rows[0];
+    const { seat_id: bookedSeatId, movie_id: bookedMovieId, timeslot_id: bookedTimeslotId } = newBooking;
 
-    if (result.rows.length > 0) {
-      const { seat_id, movie_id, timeslot_id } = result.rows[0];
-      const updateQuery = `
-        WITH selected_seat AS (
-          SELECT * FROM seats
-          WHERE seat_id = $1 AND movie_id = $2 AND timeslot_id = $3
-        )
-        UPDATE seats
-        SET booking_status = $4
-        WHERE seat_id = $1 AND movie_id = $2 AND timeslot_id = $3
-        RETURNING selected_seat.*;
-      `;
-      const params = [seat_id, movie_id, timeslot_id, 1]; // Assuming 1 represents the booked status
+    // Update seat booking status
+    const updateQuery = `
+      UPDATE seats
+      SET booking_status = $4
+      WHERE seat_id = $1 AND movie_id = $2 AND timeslot_id = $3
+      RETURNING *;
+    `;
+    const params = [bookedSeatId, bookedMovieId, bookedTimeslotId, 1]; // Assuming 1 represents the booked status
 
-      try {
-        const updateResult = await client.query(updateQuery, params);
-        const updatedSeat = updateResult.rows[0]; // The first row returned by the UPDATE query
+    const updateResult = await client.query(updateQuery, params);
+    const updatedSeat = updateResult.rows[0]; // The first row returned by the UPDATE query
 
-        if (updatedSeat) {
-          res.status(200).json({ message: 'Seat booking status updated', seat: updatedSeat });
-        } else {
-          res.status(404).json({ error: 'Seat not found' });
-        }
-      } catch (err) {
-        console.error('Error: ', err.message);
-        res.status(500).json({ error: 'Internal server error' });
-      }
-    } else {
-      res.status(404).json({ error: 'Seat not found' });
+    if (!updatedSeat) {
+      return res.status(404).json({ error: 'Seat not found or update failed' });
     }
 
-    res.status(201).json({ message: 'Booking created successfully', booking: newBooking, updatedSeat: updatedSeat });
+    // Respond with the results
+    res.status(201).json({ message: 'Booking created and seat status updated successfully', booking: newBooking, updatedSeat });
   } catch (err) {
     console.error('Error: ', err.message);
     res.status(500).json({ error: err.message });
