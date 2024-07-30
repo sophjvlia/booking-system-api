@@ -208,7 +208,28 @@ app.post('/add-booking', async (req, res) => {
 
         // Check if the insert was successful
         if (result.rows.length > 0) {
-          res.status(201).json({ message: 'Booking successful', booking: result.rows[0] });
+          // Retrieve the entire row of the newly created booking
+          const newBooking = result.rows[0];
+          const { seat_id: bookedSeatId, movie_id: bookedMovieId, timeslot_id: bookedTimeslotId } = newBooking;
+
+          // Update seat booking status
+          const updateQuery = `
+            UPDATE seats
+            SET booking_status = $4
+            WHERE seat_id = $1 AND movie_id = $2 AND timeslot_id = $3
+            RETURNING *;
+          `;
+          const params = [bookedSeatId, bookedMovieId, bookedTimeslotId, 1]; // Assuming 1 represents the booked status
+
+          const updateResult = await client.query(updateQuery, params);
+          const updatedSeat = updateResult.rows[0]; // The first row returned by the UPDATE query
+
+          if (!updatedSeat) {
+            return res.status(404).json({ error: 'Seat not found or update failed' });
+          }
+
+          // Respond with the results
+          res.status(201).json({ message: 'Booking successful', booking: newBooking, updatedSeat });
         } else {
           res.status(500).json({ error: 'Failed to create booking' });
         }
@@ -217,29 +238,6 @@ app.post('/add-booking', async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
       }
     }
-
-    // Retrieve the entire row of the newly created booking
-    const newBooking = result.rows[0];
-    const { seat_id: bookedSeatId, movie_id: bookedMovieId, timeslot_id: bookedTimeslotId } = newBooking;
-
-    // Update seat booking status
-    const updateQuery = `
-      UPDATE seats
-      SET booking_status = $4
-      WHERE seat_id = $1 AND movie_id = $2 AND timeslot_id = $3
-      RETURNING *;
-    `;
-    const params = [bookedSeatId, bookedMovieId, bookedTimeslotId, 1]; // Assuming 1 represents the booked status
-
-    const updateResult = await client.query(updateQuery, params);
-    const updatedSeat = updateResult.rows[0]; // The first row returned by the UPDATE query
-
-    if (!updatedSeat) {
-      return res.status(404).json({ error: 'Seat not found or update failed' });
-    }
-
-    // Respond with the results
-    res.status(201).json({ message: 'Booking created and seat status updated successfully', booking: newBooking, updatedSeat });
   } catch (err) {
     console.error('Error: ', err.message);
     res.status(500).json({ error: err.message });
