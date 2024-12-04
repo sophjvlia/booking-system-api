@@ -6,50 +6,48 @@ let app = express();
 app.use(cors());
 app.use(express.json());
 
-const { Pool } = require('pg');
+const { sql } = require('@vercel/postgres');
 require('dotenv').config();
-const DATABASE_URL = process.env['DATABASE_URL'];
 const SECRET_KEY = process.env['SECRET_KEY'];
 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { resourceLimits } = require('worker_threads');
 
-const pool = new Pool({
-  connectionString: DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
+// Test Route to Check PostgreSQL Version
+app.get('/version', async (req, res) => {
+  try {
+    // Query the database for its version
+    const result = await sql`SELECT version()`;
+    res.json({ version: result.rows[0].version });
+  } catch (err) {
+    console.error('Database connection error:', err);
+    res.status(500).json({ error: 'Failed to fetch PostgreSQL version' });
   }
 });
 
-async function getPostgresVersion() {
-  const client = await pool.connect();
+// Define the verifyToken middleware
+function verifyToken(req, res, next) {
+  const bearerHeader = req.headers['authorization'];
 
-  try {
-    const response = await client.query('SELECT version()');
-    console.log(response.rows[0]);
-  } finally {
-    client.release();
+  if (typeof bearerHeader !== 'undefined') {
+    const bearerToken = bearerHeader.split(' ')[1];
+    req.token = bearerToken;
+    next();
+  } else {
+    res.sendStatus(403);
   }
 }
 
-getPostgresVersion();
-
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname + '/index.html'));
-});
-
 // Register user
 app.post('/signup', async (req, res) => {
-  const client = await pool.connect();
-
   try {
     // Hash the password and check the existence of email
     const { email, password } = req.body;
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // Check for existing email
-    const userResult = await client.query('SELECT * FROM users WHERE email = $1', [email]);
+    const userResult = await sql`SELECT * FROM users WHERE email = ${email}`;
 
     // If email already exists, return response
     if (userResult.rows.length > 0) {
@@ -57,7 +55,7 @@ app.post('/signup', async (req, res) => {
     }
 
     // If email doesn't exists, then proceed to register user
-    await client.query('INSERT INTO users (email, password) VALUES ($1, $2)', [email, hashedPassword]);
+    await sql`INSERT INTO users (email, password) VALUES (${email}, ${hashedPassword})`;
 
     res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
@@ -70,10 +68,8 @@ app.post('/signup', async (req, res) => {
 
 // Login user
 app.post('/login', async (req, res) => {
-  const client = await pool.connect();
-
   try {
-    const result = await client.query('SELECT * FROM users WHERE email = $1', [req.body.email]);
+    const result = await sql`SELECT * FROM users WHERE email = ${req.body.email}`;
 
     const user = result.rows[0];
 
@@ -95,83 +91,68 @@ app.post('/login', async (req, res) => {
 
 // List all movies
 app.get('/movies', async (req, res) => {
-  const client = await pool.connect();
-
   try {
-    const query = 'SELECT * FROM movies';
-    const result = await client.query(query);
+    const result = await sql`SELECT * FROM movies`;
 
-    res.json(result.rows);
+    res.status(200).json(result.rows);
   } catch (err) {
-    console.log(err.stack);
-    res.status(500).send('An error occured while fetching movies');
-  } finally {
-    client.release();
+    console.error('Error fetching movies:', err);
+    res.status(500).send('An error occurred while fetching movies');
   }
-})
+});
 
 // List movie details
 app.get('/movies/:movie_id', async (req, res) => {
-  const client = await pool.connect();
   const { movie_id } = req.params;
 
   try {
-    const movieQuery = 'SELECT * FROM movies WHERE movie_id = $1';
-    const movieResult = await client.query(movieQuery, [movie_id]);
+    const movieResult = await sql`SELECT * FROM movies WHERE movie_id = ${movie_id}`;
 
-    const dateQuery = 'SELECT DISTINCT date FROM timeslots WHERE movie_id = $1 ORDER BY date';
-    const dateResult = await client.query(dateQuery, [movie_id]);
+    const dateResult = await sql`
+      SELECT DISTINCT date 
+      FROM timeslots 
+      WHERE movie_id = ${movie_id} 
+      ORDER BY date`;
 
     const movieDetails = movieResult.rows[0];
     const availableDates = dateResult.rows.map(row => row.date);
-    
 
-    res.json({ movie: movieDetails, available_dates: availableDates });
+    res.status(200).json({ movie: movieDetails, available_dates: availableDates });
   } catch (err) {
-    console.log(err.stack);
-    res.status(500).send('An error occured while fetching movies');
-  } finally {
-    client.release();
+    console.error('Error fetching movie details:', err);
+    res.status(500).send('An error occurred while fetching movies');
   }
 });
 
 // List available timeslots
 app.get('/movies/:movie_id/availability/:date', async (req, res) => {
-  const client = await pool.connect();
-  
   const { movie_id, date } = req.params;
 
   try {
-    const query = `
+    const result = await sql`
       SELECT DISTINCT t.timeslot_id, t.start_time, t.end_time
       FROM timeslots t
-      WHERE t.movie_id = $1 AND t.date = $2
+      WHERE t.movie_id = ${movie_id} AND t.date = ${date}
     `;
-    const result = await client.query(query, [movie_id, date]);
 
-    res.json(result.rows);
+    res.status(200).json(result.rows);
   } catch (err) {
-    console.log(err.stack);
+    console.error('Error fetching movie details:', err);
     res.status(500).send('An error occured while fetching movies');
-  } finally {
-    client.release();
-  }
+  } 
 });
 
 // List available seats
 app.get('/movies/:movie_id/:timeslot_id/seats', async (req, res) => {
-  const client = await pool.connect();
-
   const { movie_id, timeslot_id } = req.params;
 
   try {
-    const query = `
+    const result = `
       SELECT DISTINCT s.seat_id, s.seat_number, s.booking_status
       FROM seats s
-      WHERE s.movie_id = $1 AND s.timeslot_id = $2
+      WHERE s.movie_id = ${movie_id} AND s.timeslot_id = ${timeslot_id}
       ORDER BY s.seat_number ASC
     `;
-    const result = await client.query(query, [movie_id, timeslot_id]);
 
     res.json(result.rows);
   } catch (err) {
@@ -184,16 +165,11 @@ app.get('/movies/:movie_id/:timeslot_id/seats', async (req, res) => {
 
 // Create booking
 app.post('/add-booking', async (req, res) => {
-  const client = await pool.connect();
-
   try {
     const { movie_id, timeslot_id, seat_id, date, user_id, email } = req.body;
 
     // Check if the booking already exists
-    const existingBooking = await client.query(
-      'SELECT * FROM bookings WHERE movie_id = $1 AND timeslot_id = $2 AND seat_id = $3 AND date = $4',
-      [movie_id, timeslot_id, seat_id, date]
-    );
+    const existingBooking = await sql`SELECT * FROM bookings WHERE movie_id = ${movie_id} AND timeslot_id = ${timeslot_id} AND seat_id = ${seat_id} AND date = ${date}`;
 
     if (existingBooking.rows.length > 0) {
       // A booking already exists for the given movie, timeslot, seat, and date
@@ -201,10 +177,7 @@ app.post('/add-booking', async (req, res) => {
     } else {
       // Proceed with inserting the new booking
       try {
-        const result = await client.query(
-          'INSERT INTO bookings (movie_id, timeslot_id, seat_id, date, user_id, email) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-          [movie_id, timeslot_id, seat_id, date, user_id, email]
-        );
+        const result = await sql`INSERT INTO bookings (movie_id, timeslot_id, seat_id, date, user_id, email) VALUES (${movie_id}, ${timeslot_id}, ${seat_id}, ${date}, ${user_id}, ${email}) RETURNING *`;
 
         // Check if the insert was successful
         if (result.rows.length > 0) {
@@ -213,16 +186,13 @@ app.post('/add-booking', async (req, res) => {
           const { seat_id: bookedSeatId, movie_id: bookedMovieId, timeslot_id: bookedTimeslotId } = newBooking;
 
           // Update seat booking status
-          const updateQuery = `
+          const updateResult = await sql`
             UPDATE seats
-            SET booking_status = $4
-            WHERE seat_id = $1 AND movie_id = $2 AND timeslot_id = $3
+            SET booking_status = 1
+            WHERE seat_id = ${bookedSeatId} AND movie_id = ${bookedMovieId} AND timeslot_id = ${bookedTimeslotId}
             RETURNING *;
           `;
-          const params = [bookedSeatId, bookedMovieId, bookedTimeslotId, 1]; // Assuming 1 represents the booked status
-
-          const updateResult = await client.query(updateQuery, params);
-          const updatedSeat = updateResult.rows[0]; // The first row returned by the UPDATE query
+          const updatedSeat = updateResult.rows[0];
 
           if (!updatedSeat) {
             return res.status(404).json({ error: 'Seat not found or update failed' });
@@ -248,16 +218,11 @@ app.post('/add-booking', async (req, res) => {
 
 // Edit booking
 app.post('/edit-booking/:booking_id', async (req, res) => {
-  const client = await pool.connect();
-
   try {
     const { booking_id } = req.params;
     const { movie_id, timeslot_id, seat_id, date, user_id, email } = req.body;
 
-    await client.query(
-      'UPDATE bookings SET movie_id = $1, timeslot_id = $2, seat_id = $3, date = $4, user_id = $5, email = $6 WHERE booking_id = $7',
-      [movie_id, timeslot_id, seat_id, date, user_id, email, booking_id]
-    );
+    await sql`UPDATE bookings SET movie_id = ${movie_id}, timeslot_id = ${timeslot_id}, seat_id = ${seat_id}, date = ${date}, user_id = ${user_id}, email = ${email} WHERE booking_id = ${booking_id}`;
 
     res.status(200).json({ message: 'Booking updated successfully' });
   } catch (err) {
@@ -269,13 +234,11 @@ app.post('/edit-booking/:booking_id', async (req, res) => {
 });
 
 // Delete booking
-app.post('/delete-booking/:booking_id', async (req, res) => {
-  const client = await pool.connect();
-
+app.delete('/delete-booking/:booking_id', async (req, res) => {
   try {
     const { booking_id } = req.params;
 
-    await client.query('DELETE FROM bookings WHERE booking_id = $1', [booking_id]);
+    await sql`DELETE FROM bookings WHERE booking_id = ${booking_id}`;
 
     res.status(200).json({ message: 'Booking deleted successfully' });
   } catch (err) {
@@ -286,26 +249,10 @@ app.post('/delete-booking/:booking_id', async (req, res) => {
   }
 });
 
-// Define the verifyToken middleware
-function verifyToken(req, res, next) {
-  // Assuming you have a header like 'Authorization: Bearer <token>'
-  const bearerHeader = req.headers['authorization'];
-
-  if (typeof bearerHeader !== 'undefined') {
-    const bearerToken = bearerHeader.split(' ')[1];
-    req.token = bearerToken;
-    next(); // Call next middleware or route handler
-  } else {
-    res.sendStatus(403); // Forbidden if token is not provided
-  }
-}
-
 app.get('/bookings/:user_id', async (req, res) => {
-  const client = await pool.connect();
-
   try {
     const { user_id } = req.params;
-    const query = `
+    const result = await sql`
       SELECT 
         bookings.booking_id,
         bookings.date,
@@ -320,9 +267,9 @@ app.get('/bookings/:user_id', async (req, res) => {
       JOIN movies ON bookings.movie_id = movies.movie_id
       JOIN timeslots ON bookings.timeslot_id = timeslots.timeslot_id
       JOIN seats ON bookings.seat_id = seats.seat_id
-      WHERE bookings.user_id = $1
+      WHERE bookings.user_id = ${user_id}
     `;
-    const result = await client.query(query, [user_id]);
+    
     res.status(200).json({ bookings: result.rows });
   } catch (err) {
     console.error('Error: ', err.message);
@@ -330,6 +277,10 @@ app.get('/bookings/:user_id', async (req, res) => {
   } finally {
     client.release();
   }
+});
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname + '/index.html'));
 });
 
 const port = process.env.PORT || 3000;
