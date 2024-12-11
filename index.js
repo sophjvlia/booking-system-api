@@ -82,7 +82,7 @@ app.post('/login', async (req, res) => {
     if (!passwordIsValid) return res.status(401).json({ auth: false, token: null });
 
     const token = jwt.sign({ id: user.user_id, email: user.email }, SECRET_KEY, { expiresIn: '1d' });
-    res.status(200).json({ auth: true, token });
+    res.status(200).json({ auth: true, token, user_id: user.user_id });
   } catch (err) {
     console.error('Error: ', err.message);
     res.status(500).json({ error: err.message });
