@@ -192,7 +192,7 @@ app.post('/add-booking', async (req, res) => {
     res.status(201).json({ message: 'Booking successful', booking: newBooking.rows[0] });
   } catch (err) {
     console.error('Error creating booking:', err);
-    res.status(500).json({ error: 'Failed to create booking' });
+    res.status(500).json({ error: err.message });
   }
 });
 
