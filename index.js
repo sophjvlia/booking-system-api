@@ -255,6 +255,7 @@ app.get('/bookings/:user_id', async (req, res) => {
         bookings.email,
         movies.thumbnail_url,
         movies.title,
+        movies.id,
         timeslots.start_time,
         timeslots.end_time,
         seats.seat_number
